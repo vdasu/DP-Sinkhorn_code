@@ -73,6 +73,63 @@ def generate(models, num_examples, batch_size, fixed, args, metadata):
         print_tensor_prop(img, label)
     return img, label
 
+def generate_ipc(models, num_examples, batch_size, ipc, args, metadata):
+        '''
+        @param num_examples: amount to generate
+        @param batch_size: generation forward pass batch size
+        @param fixed: use fixed vectors or not
+        @param ipc: number of images per class in generated dataset
+        '''
+        assert num_examples % batch_size == 0
+        assert batch_size == ipc # for now, we only support generating one class at a time
+        
+        g = models['g']
+        device = args.device
+        img = []
+        label = []
+        g.training=False
+        bernoulli = torch.distributions.Bernoulli(torch.tensor([0.5]))
+
+        assert num_examples == ipc * g.label_dim
+
+        with torch.no_grad():
+            for i in range(1, int(num_examples / batch_size) + 1):
+                if args.noise == "uniform":
+                    z_batch = torch.rand(batch_size, g.latent_dim).to(device)
+                else:
+                    z_batch = bernoulli.sample((batch_size, g.latent_dim)).view(batch_size, g.latent_dim).to(device)
+                
+                # label_batch = torch.randint(g.label_dim, (batch_size,)).to(device)
+                label_batch = torch.tensor([(i-1) % 10] * batch_size).to(device) # hardcode label
+
+                # if fixed:
+                #     assert batch_size == num_examples and g.num_vis_examples == num_examples
+                #     img_batch, label_batch = g.sample_labelled_fixed()  # generator handles passing to shared if needed
+                # else:
+                #     img_batch, label_batch = g.sample_labelled(z_batch, label_batch)
+                
+                img_batch, label_batch = g.sample_labelled(z_batch, label_batch)
+                
+                if img_batch.shape[-1] == 32 and metadata['img_dim'][-1] == 28:
+                    img_batch = torch.nn.functional.pad(img_batch, [-2, -2, -2, -2])
+                if img_batch.shape[-1] == 28 and metadata['img_dim'][-1] == 32:  # then we are using convcond on celeb/cifar
+                    img_batch = torch.nn.functional.adaptive_avg_pool2d(img_batch, [32, 32])
+                if len(img_batch.shape) == 2:
+                    img_batch = img_batch.view((img_batch.shape[0],) + metadata['img_dim'])
+                if args.cost == 'bce':
+                    # then img need to pass through activation function
+                    img_batch = torch.sigmoid(img_batch) * 2 - 1.0
+                img.append(img_batch.detach().cpu())
+                label.append(label_batch.detach().cpu())
+
+                if i % args.print_interval == 0 or i == 1:
+                    print('| [gen] generating examples: {}/{}'.format(i * batch_size, num_examples))
+
+        img = torch.cat(img)
+        label = torch.cat(label)
+        if DEBUG:
+            print_tensor_prop(img, label)
+        return img, label
 
 def vis(models, val_data_name, global_step, writer, args, metadata):
 

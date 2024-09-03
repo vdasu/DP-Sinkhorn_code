@@ -14,7 +14,7 @@ import time
 import tensorflow as tf
 
 import copy
-from src.trainer import generate
+from src.trainer import generate, generate_ipc
 from src.train_mnist_classifier import torch_evaluate
 from src.fid import fid
 from src.data import fetch_data
@@ -196,6 +196,20 @@ def run_eval_pipeline_checkpoint(checkpoint_path, gen_batch_size, start, k, args
     print(args.checkpoint)
     print(logreg_acc, mlp_acc, cnn_acc, fid_score)
 
+def run_eval_pipeline_checkpoint_ipc(checkpoint_path, gen_batch_size, start, k, args):
+    (val_img, val_label), metadata = fetch_data(args.dataset, args.datadir, training=False, download=False, as_array=True)
+    val_img = torch.tensor(val_img) * 2 - 1.0
+    val_label = torch.tensor(val_label)
+    g, args = load_checkpoint_for_eval(checkpoint_path, start, k, args, metadata)
+    g.eval()
+    args.expdir='.'
+    
+    gen_img, gen_label = generate_ipc({'g': g}, args.ipc * g.label_dim, gen_batch_size, args.ipc, args=args, metadata=metadata)
+    del g
+    logreg_acc, mlp_acc, cnn_acc, fid_score, sample_image = run_eval_pipeline(gen_img, gen_label, val_img, val_label, args)
+
+    print(args.checkpoint)
+    print(logreg_acc, mlp_acc, cnn_acc, fid_score)
 
 def extract_acc(res):
     return [(acc_key, res[0][acc_key]) for acc_key in [k for k in res[0].keys() if k[:3] == 'acc']]
@@ -207,6 +221,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", default='mnist', choices=['mnist', 'fashion_mnist', 'celeb_32_2'], type=str)
     parser.add_argument("--datadir", type=str, default='datasets')
     parser.add_argument("--inception_dir", type=str, default='inception_checkpoint')
+    parser.add_argument("--ipc", default=1, description='images per class')
     parser.add_argument("--fid_checkpoint_dir", type=str, default='fid_checkpoints')
     parser.add_argument("--gen_batch_size", type=int, default=256)
     parser.add_argument("--seed", type=int, default=0)
@@ -220,7 +235,9 @@ if __name__ == "__main__":
     os.makedirs(args.fid_checkpoint_dir, exist_ok=True)
     os.makedirs(os.path.join(args.fid_checkpoint_dir, args.dataset), exist_ok=True)
 
-    run_eval_pipeline_checkpoint(args.checkpoint, args.gen_batch_size, 0, 0, args)
+    # run_eval_pipeline_checkpoint(args.checkpoint, args.gen_batch_size, 0, 0, args)
+    run_eval_pipeline_checkpoint(args.checkpoint, args.ipc, 0, 0, args)
+
 
 
 
