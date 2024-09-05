@@ -143,10 +143,13 @@ def load_checkpoint_for_eval(path, start, k, args, metadata):
 
 
 def run_eval_pipeline(img, label, val_img, val_label, args):
-    if args.dataset =="celeb_32_2":
-        grid = sorted_grid_celeb(img, label)
-    else:
-        grid = sorted_grid(img, label)
+    try:
+        if args.dataset =="celeb_32_2":
+            grid = sorted_grid_celeb(img, label)
+        else:
+            grid = sorted_grid(img, label)
+    except:
+        grid = None
 
     # torch log_reg
     img[img < 0.] = -1.0
@@ -204,7 +207,7 @@ def run_eval_pipeline_checkpoint_ipc(checkpoint_path, gen_batch_size, start, k, 
     g.eval()
     args.expdir='.'
     
-    gen_img, gen_label = generate_ipc({'g': g}, args.ipc * g.label_dim, gen_batch_size, args.ipc, args=args, metadata=metadata)
+    gen_img, gen_label = generate_ipc({'g': g}, args.ipc * g.label_dim, gen_batch_size, False, args=args, metadata=metadata)
     del g
     logreg_acc, mlp_acc, cnn_acc, fid_score, sample_image = run_eval_pipeline(gen_img, gen_label, val_img, val_label, args)
 
@@ -221,7 +224,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", default='mnist', choices=['mnist', 'fashion_mnist', 'celeb_32_2'], type=str)
     parser.add_argument("--datadir", type=str, default='datasets')
     parser.add_argument("--inception_dir", type=str, default='inception_checkpoint')
-    parser.add_argument("--ipc", default=1, description='images per class')
+    parser.add_argument("--ipc", type=int, default=1)
     parser.add_argument("--fid_checkpoint_dir", type=str, default='fid_checkpoints')
     parser.add_argument("--gen_batch_size", type=int, default=256)
     parser.add_argument("--seed", type=int, default=0)
@@ -236,8 +239,7 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(args.fid_checkpoint_dir, args.dataset), exist_ok=True)
 
     # run_eval_pipeline_checkpoint(args.checkpoint, args.gen_batch_size, 0, 0, args)
-    run_eval_pipeline_checkpoint(args.checkpoint, args.ipc, 0, 0, args)
-
+    run_eval_pipeline_checkpoint_ipc(args.checkpoint, args.gen_batch_size, 0, 0, args)
 
 
 

@@ -183,10 +183,17 @@ def torch_evaluate(train_img, train_label, val_image, val_label, device, arch='M
         net = CNN(img_dim, num_classes=val_label.max().item()+1).cuda()
 
     n_train = int(num_sample*0.9)
-    trainloader = DataLoader(TensorDataset(train_img[:n_train].cuda(), train_label[:n_train].cuda()), shuffle=True,
-                             batch_size=batch_size, num_workers=0)
-    valloader = DataLoader(TensorDataset(train_img[n_train:].cuda(), train_label[n_train:].cuda()), batch_size=batch_size, num_workers=0)
-    testloader = DataLoader(TensorDataset(val_image, val_label), batch_size=batch_size, num_workers=0)
+    if num_sample < 1000:
+        # create valloader with overlap with trainloader
+        trainloader = DataLoader(TensorDataset(train_img.cuda(), train_label.cuda()), shuffle=True,
+                                batch_size=batch_size, num_workers=0)
+        valloader = DataLoader(TensorDataset(train_img.cuda(), train_label.cuda()), batch_size=batch_size, num_workers=0)
+        testloader = DataLoader(TensorDataset(val_image, val_label), batch_size=batch_size, num_workers=0)
+    else:
+        trainloader = DataLoader(TensorDataset(train_img[:n_train].cuda(), train_label[:n_train].cuda()), shuffle=True,
+                                batch_size=batch_size, num_workers=0)
+        valloader = DataLoader(TensorDataset(train_img[n_train:].cuda(), train_label[n_train:].cuda()), batch_size=batch_size, num_workers=0)
+        testloader = DataLoader(TensorDataset(val_image, val_label), batch_size=batch_size, num_workers=0)
 
     if arch in ['MLP', 'LogReg'] or optim_choice == 'Adam':
         optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-6)
