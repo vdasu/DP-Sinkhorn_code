@@ -185,9 +185,10 @@ def torch_evaluate(train_img, train_label, val_image, val_label, device, arch='M
     n_train = int(num_sample*0.9)
     if num_sample < 1000:
         # create valloader with overlap with trainloader
+        n_train = int(num_sample*0.6)
         trainloader = DataLoader(TensorDataset(train_img.cuda(), train_label.cuda()), shuffle=True,
                                 batch_size=batch_size, num_workers=0)
-        valloader = DataLoader(TensorDataset(train_img.cuda(), train_label.cuda()), batch_size=batch_size, num_workers=0)
+        valloader = DataLoader(TensorDataset(train_img[n_train:].cuda(), train_label[n_train:].cuda()), batch_size=batch_size, num_workers=0)
         testloader = DataLoader(TensorDataset(val_image, val_label), batch_size=batch_size, num_workers=0)
     else:
         trainloader = DataLoader(TensorDataset(train_img[:n_train].cuda(), train_label[:n_train].cuda()), shuffle=True,
@@ -195,11 +196,14 @@ def torch_evaluate(train_img, train_label, val_image, val_label, device, arch='M
         valloader = DataLoader(TensorDataset(train_img[n_train:].cuda(), train_label[n_train:].cuda()), batch_size=batch_size, num_workers=0)
         testloader = DataLoader(TensorDataset(val_image, val_label), batch_size=batch_size, num_workers=0)
 
-    if arch in ['MLP', 'LogReg'] or optim_choice == 'Adam':
+    if arch in ['MLP', 'LogReg'] or optim_choice == 'Adam' or num_sample < 1000:
         optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-6)
         max_epoch = 300
     else:
         optimizer = optim.SGD(net.parameters(), lr=1e-3)
+        max_epoch = 500
+    
+    if arch not in ['MLP', 'LogReg']:
         max_epoch = 500
 
     patience = patience
