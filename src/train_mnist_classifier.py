@@ -164,21 +164,39 @@ class CNN(nn.Module):
 #     def pred(self, x):
 #         return F.softmax(self.cla(self.fe(x)), dim=1)
 
+# class MLP(nn.Module):
+
+#     def __init__(self, img_dim=(1,28,28), num_classes=10):
+#         super(MLP, self).__init__()
+#         self.net = torch.nn.Sequential(
+#             nn.Linear(np.prod(img_dim), 100),
+#             nn.ReLU(),
+#             nn.Linear(100, num_classes),
+#         )
+
+#     def forward(self, x):
+#         return F.log_softmax(self.net(x), dim=1)
+
+#     def pred(self, x):
+#         return F.softmax(self.net(x), dim=1)
+    
 class MLP(nn.Module):
-
-    def __init__(self, img_dim=(1,28,28), num_classes=10):
+    
+    def __init__(self, channel, num_classes):
         super(MLP, self).__init__()
-        self.net = torch.nn.Sequential(
-            nn.Linear(np.prod(img_dim), 100),
-            nn.ReLU(),
-            nn.Linear(100, num_classes),
-        )
-
+        self.fc_1 = nn.Linear(28*28*1 if channel==1 else 32*32*3, 128)
+        self.fc_2 = nn.Linear(128, 128)
+        self.fc_3 = nn.Linear(128, num_classes)
+    
     def forward(self, x):
-        return F.log_softmax(self.net(x), dim=1)
-
+        out = x.view(x.size(0), -1)
+        out = F.relu(self.fc_1(out))
+        out = F.relu(self.fc_2(out))
+        out = self.fc_3(out)
+        return out
+    
     def pred(self, x):
-        return F.softmax(self.net(x), dim=1)
+        return F.softmax(self.forward(x), dim=1)
 
 
 class LogReg(nn.Module):
@@ -204,7 +222,8 @@ def train(model, device, train_loader, optimizer, epoch):
         data, target = data.cuda(), target.cuda()
         optimizer.zero_grad()
         output = model(data)
-        loss = F.nll_loss(output, target)
+        # loss = F.nll_loss(output, target)
+        loss = F.cross_entropy(output, target)
         loss.backward()
         optimizer.step()
     return
@@ -278,11 +297,13 @@ def torch_evaluate(train_img, train_label, val_image, val_label, device, arch='M
         testloader = DataLoader(TensorDataset(val_image, val_label), batch_size=batch_size, num_workers=0)
 
     if arch in ['MLP', 'LogReg'] or optim_choice == 'Adam' or num_sample < 1000:
-        optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-6)
-        max_epoch = 300
+        # optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-6)
+        # max_epoch = 300
+        optimizer = optim.SGD(net.parameters(), lr=1e-2)
+        max_epoch = 1000
     else:
-        optimizer = optim.SGD(net.parameters(), lr=1e-3)
-        max_epoch = 500
+        optimizer = optim.SGD(net.parameters(), lr=1e-2)
+        max_epoch = 1000
     
     if arch not in ['MLP', 'LogReg']:
         max_epoch = 500
